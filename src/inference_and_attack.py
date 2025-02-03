@@ -547,6 +547,56 @@ if __name__ == "__main__":
 
 
 
+# iteration 에서 어택 잘 된 시퀀스가 다시 바뀌는 문제를 해결하기위한 방편책코드 추가함Feb 3rd, 2025  
+base_path = "/content/drive/MyDrive/RDL/prj/data/" #"data/"
+
+iteration_files = [
+    f"test_{task_name}_atk_{model_short_name}_nucl_iter100_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_nucl_iter200_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_nucl_iter300_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_nucl_iter400_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_nucl_iter500_rate0.1.csv",
+]
+
+# 원본 데이터 로드 및 DataLoader 생성
+test_df = preprocess_data(test_dir, max_len)
+test_dataloader = create_dataloader(test_df, label_to_id, batch_size)
+
+print("Running prediction for original test data...")
+original_predictions, true_labels, logits = predict(model, test_dataloader, device)
+
+# 공격 성공한 시퀀스를 추적할 딕셔너리 (idx 기준)
+successful_attacks = {}
+
+# 각 iteration 파일을 순차적으로 업데이트
+for i, file in enumerate(iteration_files):
+    print(f"Processing {base_path}{file}...")
+    
+    df_adv = preprocess_data(base_path + file, max_len)
+    adv_test_dataloader = create_dataloader(df_adv, label_to_id, batch_size)
+    adv_predictions, _, _ = predict(model, adv_test_dataloader, device)
+    
+    # 이전 단계에서 성공한 공격을 유지
+    for idx in successful_attacks:
+        df_adv.iloc[idx] = successful_attacks[idx]
+    
+    # 새로운 공격 성공한 시퀀스 탐색
+    for idx in range(len(test_df)):
+        orig_label = original_predictions[idx]  # 원본 예측
+        adv_label = adv_predictions[idx]  # 현재 iteration 예측
+
+        # 원본에서는 정확히 분류되었지만, 이번 iteration에서 잘못 분류된 경우 공격 성공
+        if orig_label == true_labels[idx] and adv_label != true_labels[idx]:
+            successful_attacks[idx] = df_adv.iloc[idx]
+
+    # 업데이트된 파일 저장
+    df_adv.to_csv(base_path + "updated_" + file, index=False)
+    print(f"Updated {file} with successful attacks.")
+
+print("All iteration files updated successfully!")
+#
+
+
 
 # Main 실행에 추가된 부분
 if __name__ == "__main__":
