@@ -551,11 +551,11 @@ if __name__ == "__main__":
 base_path = "/content/drive/MyDrive/RDL/prj/data/" #"data/"
 
 iteration_files = [
-    f"test_{task_name}_atk_{model_short_name}_nucl_iter100_rate0.1.csv",
-    f"test_{task_name}_atk_{model_short_name}_nucl_iter200_rate0.1.csv",
-    f"test_{task_name}_atk_{model_short_name}_nucl_iter300_rate0.1.csv",
-    f"test_{task_name}_atk_{model_short_name}_nucl_iter400_rate0.1.csv",
-    f"test_{task_name}_atk_{model_short_name}_nucl_iter500_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_{attack_name}_iter100_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_{attack_name}_iter200_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_{attack_name}_iter300_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_{attack_name}_iter400_rate0.1.csv",
+    f"test_{task_name}_atk_{model_short_name}_{attack_name}_iter500_rate0.1.csv",
 ]
 
 # 원본 데이터 로드 및 DataLoader 생성
