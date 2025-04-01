@@ -65,30 +65,74 @@ tokenizer = AutoTokenizer.from_pretrained("yangheng/MP-RNA")
 # 기본 MP-RNA 모델 로드
 base_model = AutoModel.from_pretrained("yangheng/MP-RNA")
 
-# 커스텀 분류 모델 정의
+
+#### v1. one layer finetune
+# # 커스텀 분류 모델 정의
+# class CustomMPRNAForSequenceClassification(nn.Module):
+#     def __init__(self, base_model, num_labels):
+#         super().__init__()
+#         self.base_model = base_model
+#         self.num_labels = num_labels
+#         # MP-RNA의 hidden_size를 확인해야 함 (예: 768)
+#         self.classifier = nn.Linear(base_model.config.hidden_size, num_labels)
+#         self.dropout = nn.Dropout(0.1)
+
+#     def forward(self, input_ids, attention_mask=None, labels=None):
+#         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+#         pooled_output = outputs[0][:, 0, :]  # [CLS] 토큰의 출력 사용 (모델 구조에 따라 다를 수 있음)
+#         pooled_output = self.dropout(pooled_output)
+#         logits = self.classifier(pooled_output)
+
+#         loss = None
+#         if labels is not None:
+#             loss_fct = nn.CrossEntropyLoss()
+#             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+#         return {"logits": logits, "loss": loss} if loss is not None else {"logits": logits}
+
+# # 모델 인스턴스 생성
+# model = CustomMPRNAForSequenceClassification(base_model, num_labels=len(label_to_id)).to(device)
+
+## v2. weighted label one layer fine tune -> much much better performance
+# 클래스별 샘플 수
+from sklearn.utils.class_weight import compute_class_weight
+
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=np.unique(train_df["label"]),
+    y=train_df["label"]
+)
+
+class_weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
+
+
 class CustomMPRNAForSequenceClassification(nn.Module):
-    def __init__(self, base_model, num_labels):
+    def __init__(self, base_model, num_labels, class_weights=None):
         super().__init__()
         self.base_model = base_model
         self.num_labels = num_labels
-        # MP-RNA의 hidden_size를 확인해야 함 (예: 768)
+        self.class_weights = class_weights
         self.classifier = nn.Linear(base_model.config.hidden_size, num_labels)
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, input_ids, attention_mask=None, labels=None):
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
-        pooled_output = outputs[0][:, 0, :]  # [CLS] 토큰의 출력 사용 (모델 구조에 따라 다를 수 있음)
+        pooled_output = outputs[0][:, 0, :]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
         loss = None
         if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
+            loss_fct = nn.CrossEntropyLoss(weight=self.class_weights)
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
         return {"logits": logits, "loss": loss} if loss is not None else {"logits": logits}
 
-# 모델 인스턴스 생성
-model = CustomMPRNAForSequenceClassification(base_model, num_labels=len(label_to_id)).to(device)
+
+model = CustomMPRNAForSequenceClassification(base_model, num_labels=len(label_to_id), class_weights=class_weights_tensor).to(device)
+
+
+
+
+
 
 # 평가 지표
 def compute_metrics(eval_pred):
@@ -103,14 +147,27 @@ def compute_metrics(eval_pred):
     }
 
 # Trainer 설정
+# training_args = TrainingArguments(
+#     output_dir="./mp_rna_output",
+#     evaluation_strategy="epoch",
+#     save_strategy="epoch",
+#     learning_rate=5e-4,
+#     per_device_train_batch_size=8,
+#     per_device_eval_batch_size=64,
+#     num_train_epochs=3,
+#     weight_decay=0.01,
+#     load_best_model_at_end=True,
+#     metric_for_best_model="f1_macro",
+#     logging_dir="./logs"
+# )
 training_args = TrainingArguments(
     output_dir="./mp_rna_output",
     evaluation_strategy="epoch",
     save_strategy="epoch",
-    learning_rate=5e-4,
+    learning_rate=2e-4, #5e-4,
     per_device_train_batch_size=8,
     per_device_eval_batch_size=64,
-    num_train_epochs=3,
+    num_train_epochs=5, #3,
     weight_decay=0.01,
     load_best_model_at_end=True,
     metric_for_best_model="f1_macro",
