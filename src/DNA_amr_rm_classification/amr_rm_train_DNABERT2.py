@@ -1,3 +1,13 @@
+
+# !pip install transformers
+# !pip install datasets
+# !pip install triton==2.0.0.dev20221202
+# !pip install einops
+# !pip install accelerate -U
+# !pip install peft
+
+
+
 from google.colab import drive
 drive.mount("/content/drive")
 
